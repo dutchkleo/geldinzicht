@@ -1,0 +1,1670 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Financieel Dashboard — Gezinsoverzicht</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,600;1,400&family=Nunito:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #f7f5f0;
+    --surface: #ffffff;
+    --surface2: #f0ede6;
+    --border: #ddd8cc;
+    --accent: #007c67;
+    --accent-light: #e8f4f1;
+    --accent2: #7ea177;
+    --accent3: #c0392b;
+    --accent4: #5a8a7a;
+    --text: #2d3a35;
+    --text-muted: #7a8c84;
+    --income: #007c67;
+    --expense: #c0392b;
+    --savings: #b8860b;
+    --yellow: #f2d9a4;
+    --yellow-dark: #c9a84c;
+    --radius: 14px;
+    --shadow: 0 2px 16px rgba(0,124,103,0.08);
+    --shadow-hover: 0 6px 24px rgba(0,124,103,0.14);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Nunito', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  /* ── HEADER ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 32px;
+    border-bottom: 2px solid var(--yellow);
+    background: var(--surface);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 2px 12px rgba(0,124,103,0.07);
+  }
+  .logo {
+    font-family: 'Lora', serif;
+    font-size: 22px;
+    color: var(--accent);
+    letter-spacing: -0.3px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .logo span { color: var(--text-muted); font-size: 13px; font-family: 'Nunito', sans-serif; margin-left: 4px; font-weight: 400; }
+
+  /* ── LAYOUT ── */
+  .app { display: flex; height: calc(100vh - 63px); }
+
+  /* ── SIDEBAR ── */
+  aside {
+    width: 220px;
+    min-width: 220px;
+    background: var(--accent);
+    border-right: none;
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow-y: auto;
+  }
+  .nav-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: rgba(255,255,255,0.5);
+    padding: 14px 20px 5px;
+    text-transform: uppercase;
+  }
+  .nav-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.75);
+    transition: all 0.15s;
+    font-weight: 500;
+    border-left: 3px solid transparent;
+    margin: 0 8px;
+    border-radius: 8px;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.12); color: #fff; }
+  .nav-item.active { background: rgba(255,255,255,0.18); color: #fff; border-left-color: var(--yellow); font-weight: 700; }
+  .nav-icon { font-size: 16px; width: 20px; text-align: center; }
+
+  /* ── MAIN ── */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── PAGE SECTIONS ── */
+  .page { display: none; flex-direction: column; gap: 24px; }
+  .page.active { display: flex; }
+
+  /* ── IMPORT ZONE ── */
+  .import-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 40px;
+    text-align: center;
+    background: var(--surface);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .import-zone:hover, .import-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-light);
+  }
+  .import-zone h3 { font-family: 'Lora', serif; font-size: 18px; color: var(--accent); margin-bottom: 8px; }
+  .import-zone p { color: var(--text-muted); font-size: 13px; }
+  .import-zone input[type=file] { display: none; }
+
+  .account-files { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+  .account-file-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .account-file-card .name { font-weight: 500; font-size: 13px; }
+  .account-file-card .meta { color: var(--text-muted); font-size: 11px; margin-top: 2px; }
+  .account-file-card .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent2); flex-shrink: 0; }
+  .account-file-card .remove { cursor: pointer; color: var(--text-muted); font-size: 18px; line-height: 1; }
+  .account-file-card .remove:hover { color: var(--expense); }
+
+  /* ── ACCOUNT MAPPING ── */
+  .mapping-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+  }
+  .mapping-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px;
+  }
+  .mapping-card label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 6px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; }
+  .mapping-card select, .mapping-card input {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 8px 10px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .mapping-card select:focus, .mapping-card input:focus { border-color: var(--accent); }
+
+  /* ── KPI STRIP ── */
+  .kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 14px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%;
+    height: 4px;
+    background: var(--accent);
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
+  .kpi-card.income::before { background: var(--income); }
+  .kpi-card.expense::before { background: var(--expense); }
+  .kpi-card.savings::before { background: var(--yellow-dark); }
+  .kpi-card.balance::before { background: var(--accent2); }
+  .kpi-label { font-size: 11px; color: var(--text-muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.8px; }
+  .kpi-value { font-family: 'Lora', serif; font-size: 26px; color: var(--text); margin-top: 4px; }
+  .kpi-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-bar select, .filter-bar input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+    cursor: pointer;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { border-color: var(--accent); }
+  .filter-bar label { color: var(--text-muted); font-size: 12px; font-weight: 500; }
+
+  .btn {
+    background: var(--accent);
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 18px;
+    font-family: 'Nunito', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn:hover { background: #006654; box-shadow: 0 3px 10px rgba(0,124,103,0.25); }
+  .btn.secondary { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+  .btn.secondary:hover { border-color: var(--accent); color: var(--accent); box-shadow: none; background: var(--surface2); }
+  .btn.danger { background: rgba(192,57,43,0.08); color: var(--expense); border: 1px solid rgba(192,57,43,0.25); }
+  .btn.danger:hover { background: rgba(192,57,43,0.14); box-shadow: none; }
+
+  /* ── CHARTS ── */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 18px;
+  }
+  .chart-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 18px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+  }
+  .card-title {
+    font-family: 'Lora', serif;
+    font-size: 16px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .card-title small { font-family: 'DM Sans', sans-serif; font-size: 11px; color: var(--text-muted); font-weight: 400; }
+  .chart-wrap { position: relative; width: 100%; }
+
+  /* ── TRANSACTION TABLE ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead tr { border-bottom: 1px solid var(--border); }
+  th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--text-muted);
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+  }
+  th:hover { color: var(--accent); }
+  td { padding: 9px 12px; border-bottom: 1px solid rgba(126,161,119,0.15); white-space: nowrap; }
+  tr:hover td { background: var(--accent-light); }
+  .amount-in { color: var(--income); font-weight: 500; }
+  .amount-out { color: var(--expense); font-weight: 500; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .badge:hover { border-color: var(--accent); color: var(--accent); }
+  .badge.cat-food { background: rgba(126,184,164,0.15); border-color: rgba(126,184,164,0.4); color: var(--income); }
+  .badge.cat-wonen { background: rgba(200,169,110,0.15); border-color: rgba(200,169,110,0.4); color: var(--savings); }
+  .badge.cat-transport { background: rgba(143,163,212,0.15); border-color: rgba(143,163,212,0.4); color: var(--accent4); }
+  .badge.cat-inkomen { background: rgba(126,184,164,0.2); border-color: rgba(126,184,164,0.5); color: var(--income); font-weight: 600; }
+  .badge.cat-sparen { background: rgba(200,169,110,0.2); border-color: rgba(200,169,110,0.5); color: var(--savings); }
+  .badge.cat-other { background: var(--surface2); border-color: var(--border); color: var(--text-muted); }
+
+  /* ── PAGINATION ── */
+  .pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 12px;
+    color: var(--text-muted);
+    font-size: 12px;
+  }
+  .pagination button {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 4px 10px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .pagination button:hover { border-color: var(--accent); color: var(--accent); }
+  .pagination button:disabled { opacity: 0.3; cursor: default; }
+
+  /* ── CATEGORY EDITOR ── */
+  .cat-list { display: flex; flex-direction: column; gap: 8px; }
+  .cat-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+  }
+  .cat-color { width: 14px; height: 14px; border-radius: 3px; flex-shrink: 0; }
+  .cat-name { flex: 1; font-weight: 500; }
+  .cat-keywords { font-size: 11px; color: var(--text-muted); flex: 2; }
+  .cat-actions { display: flex; gap: 6px; }
+
+  /* ── MODAL ── */
+  .modal-backdrop {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.65);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-backdrop.open { display: flex; }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px;
+    width: 480px;
+    max-width: 95vw;
+    box-shadow: var(--shadow);
+  }
+  .modal h3 { font-family: 'Lora', serif; font-size: 20px; margin-bottom: 18px; color: var(--accent); }
+  .form-row { margin-bottom: 14px; }
+  .form-row label { display: block; font-size: 11px; color: var(--text-muted); margin-bottom: 5px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.7px; }
+  .form-row input, .form-row select, .form-row textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    padding: 9px 11px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+  }
+  .form-row input:focus, .form-row select:focus { border-color: var(--accent); }
+  .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+
+  /* ── ACCOUNTS ── */
+  .accounts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 16px;
+  }
+  .account-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    transition: border-color 0.2s;
+  }
+  .account-card:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); }
+  .account-card .ac-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .account-card .ac-name { font-family: 'DM Serif Display', serif; font-size: 17px; }
+  .account-card .ac-owner { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .account-card .ac-type-badge {
+    font-size: 10px;
+    padding: 3px 8px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .account-card .ac-balance { font-family: 'Lora', serif; font-size: 28px; color: var(--accent); }
+  .account-card .ac-stats {
+    display: flex;
+    gap: 16px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .account-card .ac-stat { font-size: 11px; color: var(--text-muted); }
+  .account-card .ac-stat span { display: block; font-size: 13px; font-weight: 500; margin-top: 2px; }
+  .account-card .ac-stat .in { color: var(--income); }
+  .account-card .ac-stat .out { color: var(--expense); }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-muted);
+  }
+  .empty-state .icon { font-size: 48px; margin-bottom: 16px; opacity: 0.5; }
+  .empty-state h3 { font-family: 'DM Serif Display', serif; font-size: 20px; color: var(--text); margin-bottom: 8px; }
+
+  /* ── SEARCH ── */
+  .search-input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    padding: 8px 12px;
+    font-size: 13px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    width: 220px;
+  }
+  .search-input:focus { border-color: var(--accent); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--accent);
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    z-index: 9999;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s;
+    max-width: 300px;
+    box-shadow: 0 4px 20px rgba(0,124,103,0.3);
+  }
+  #toast.show { transform: translateY(0); opacity: 1; }
+
+  .section-title {
+    font-family: 'Lora', serif;
+    font-size: 20px;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .section-sub { font-size: 13px; color: var(--text-muted); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--accent2); }
+
+  /* ── CORNER CAT ── */
+  #corner-cat {
+    position: fixed;
+    bottom: 18px;
+    left: 230px;
+    z-index: 50;
+    pointer-events: none;
+    opacity: 0.82;
+    animation: cat-breathe 4s ease-in-out infinite;
+  }
+  @keyframes cat-breathe {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+  }
+
+  .tag-bubble {
+    display: inline-block;
+    padding: 2px 7px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    background: rgba(0,124,103,0.1);
+    color: var(--accent);
+    border: 1px solid rgba(0,124,103,0.25);
+    margin-right: 3px;
+  }
+
+  .progress-bar-wrap { background: var(--surface2); border-radius: 4px; height: 7px; overflow: hidden; margin-top: 6px; }
+  .progress-bar { height: 100%; border-radius: 4px; background: var(--accent2); transition: width 0.6s ease; }
+
+  .trend-up { color: var(--income); }
+  .trend-down { color: var(--expense); }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <svg width="30" height="30" viewBox="0 0 30 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <ellipse cx="15" cy="17" rx="11" ry="9" fill="#7ea177" opacity="0.25"/>
+      <ellipse cx="15" cy="16" rx="9" ry="8" fill="#f7f5f0" stroke="#7ea177" stroke-width="1.2"/>
+      <polygon points="7,10 9,4 12,9" fill="#7ea177"/>
+      <polygon points="23,10 21,4 18,9" fill="#7ea177"/>
+      <ellipse cx="12" cy="15" rx="1.5" ry="2" fill="#007c67"/>
+      <ellipse cx="18" cy="15" rx="1.5" ry="2" fill="#007c67"/>
+      <ellipse cx="15" cy="18" rx="1.2" ry="0.9" fill="#f2d9a4"/>
+      <line x1="15" y1="18.9" x2="15" y2="21" stroke="#7ea177" stroke-width="0.8"/>
+      <line x1="9" y1="17" x2="5" y2="16" stroke="#7ea177" stroke-width="0.7"/>
+      <line x1="9" y1="18" x2="5" y2="18.5" stroke="#7ea177" stroke-width="0.7"/>
+      <line x1="21" y1="17" x2="25" y2="16" stroke="#7ea177" stroke-width="0.7"/>
+      <line x1="21" y1="18" x2="25" y2="18.5" stroke="#7ea177" stroke-width="0.7"/>
+    </svg>
+    Financieel Dashboard <span>Gezinsoverzicht</span>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <span id="header-period" style="color:var(--text-muted);font-size:12px;"></span>
+    <button class="btn secondary" onclick="exportCSV()">↓ Export</button>
+    <button class="btn" onclick="showPage('import')">+ CSV Importeren</button>
+  </div>
+</header>
+
+<div class="app">
+  <aside>
+    <div class="nav-label">Overzicht</div>
+    <div class="nav-item active" onclick="showPage('dashboard')"><span class="nav-icon">◈</span> Dashboard</div>
+    <div class="nav-item" onclick="showPage('accounts')"><span class="nav-icon">⬡</span> Rekeningen</div>
+    <div class="nav-item" onclick="showPage('transactions')"><span class="nav-icon">≡</span> Transacties</div>
+
+    <div class="nav-label">Analyse</div>
+    <div class="nav-item" onclick="showPage('categories')"><span class="nav-icon">◉</span> Categorieën</div>
+    <div class="nav-item" onclick="showPage('trends')"><span class="nav-icon">∿</span> Trends</div>
+
+    <div class="nav-label">Beheer</div>
+    <div class="nav-item" onclick="showPage('import')"><span class="nav-icon">↑</span> Importeren</div>
+    <div class="nav-item" onclick="showPage('settings')"><span class="nav-icon">⚙</span> Instellingen</div>
+  </aside>
+
+  <main>
+
+    <!-- ═══ DASHBOARD ═══ -->
+    <div class="page active" id="page-dashboard">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div class="section-title">Dashboard</div>
+          <div class="section-sub" id="dash-period-label">Geen gegevens geladen — importeer uw CSV-bestanden</div>
+        </div>
+        <div class="filter-bar">
+          <label>Maand</label>
+          <select id="filter-month" onchange="applyFilters()"></select>
+          <label>Jaar</label>
+          <select id="filter-year" onchange="applyFilters()"></select>
+          <label>Rekening</label>
+          <select id="filter-account" onchange="applyFilters()"></select>
+        </div>
+      </div>
+
+      <div class="kpi-strip">
+        <div class="kpi-card income">
+          <div class="kpi-label">Inkomsten</div>
+          <div class="kpi-value" id="kpi-income">€ 0</div>
+          <div class="kpi-sub" id="kpi-income-sub">deze periode</div>
+        </div>
+        <div class="kpi-card expense">
+          <div class="kpi-label">Uitgaven</div>
+          <div class="kpi-value" id="kpi-expense">€ 0</div>
+          <div class="kpi-sub" id="kpi-expense-sub">deze periode</div>
+        </div>
+        <div class="kpi-card savings">
+          <div class="kpi-label">Spaartransfers</div>
+          <div class="kpi-value" id="kpi-savings">€ 0</div>
+          <div class="kpi-sub">naar spaarrekeningen</div>
+        </div>
+        <div class="kpi-card balance">
+          <div class="kpi-label">Netto Resultaat</div>
+          <div class="kpi-value" id="kpi-net">€ 0</div>
+          <div class="kpi-sub" id="kpi-net-sub">inkomsten − uitgaven</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">Transacties</div>
+          <div class="kpi-value" id="kpi-count">0</div>
+          <div class="kpi-sub" id="kpi-count-sub">in deze periode</div>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="card">
+          <div class="card-title">In- & Uitgaven per Maand <small id="chart-year-label"></small></div>
+          <div class="chart-wrap" style="height:220px;"><canvas id="chart-monthly"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Uitgaven per Categorie</div>
+          <div class="chart-wrap" style="height:220px;"><canvas id="chart-cat-pie"></canvas></div>
+        </div>
+      </div>
+
+      <div class="chart-grid">
+        <div class="card">
+          <div class="card-title">Top Categorieën — Uitgaven <small>geselecteerde periode</small></div>
+          <div id="cat-bars"></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Recente Transacties</div>
+          <div id="recent-tx" style="font-size:13px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ ACCOUNTS ═══ -->
+    <div class="page" id="page-accounts">
+      <div>
+        <div class="section-title">Rekeningen</div>
+        <div class="section-sub">Overzicht van alle gekoppelde rekeningen</div>
+      </div>
+      <div class="accounts-grid" id="accounts-grid">
+        <div class="empty-state" style="grid-column:1/-1;">
+          <div class="icon">⬡</div>
+          <h3>Nog geen rekeningen</h3>
+          <p>Importeer CSV-bestanden om uw rekeningen te zien.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ TRANSACTIONS ═══ -->
+    <div class="page" id="page-transactions">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+        <div>
+          <div class="section-title">Transacties</div>
+          <div class="section-sub" id="tx-count-label">0 transacties</div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" class="search-input" id="tx-search" placeholder="Zoeken…" oninput="renderTransactions()">
+          <select id="tx-filter-month" onchange="renderTransactions()"></select>
+          <select id="tx-filter-year" onchange="renderTransactions()"></select>
+          <select id="tx-filter-account" onchange="renderTransactions()"></select>
+          <select id="tx-filter-cat" onchange="renderTransactions()"></select>
+          <select id="tx-filter-dir" onchange="renderTransactions()">
+            <option value="">Alle</option>
+            <option value="Af">Uitgaven</option>
+            <option value="Bij">Inkomsten</option>
+          </select>
+        </div>
+      </div>
+      <div class="card">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th onclick="sortTx('datum')">Datum ↕</th>
+                <th onclick="sortTx('naam')">Naam / Omschrijving ↕</th>
+                <th>Rekening</th>
+                <th>Tegenrekening</th>
+                <th>Code</th>
+                <th onclick="sortTx('bedrag')">Bedrag ↕</th>
+                <th>Type</th>
+                <th>Categorie</th>
+                <th>Tag</th>
+                <th>Saldo na</th>
+              </tr>
+            </thead>
+            <tbody id="tx-table-body"></tbody>
+          </table>
+        </div>
+        <div class="pagination">
+          <span id="page-info"></span>
+          <button id="btn-prev" onclick="txPage--; renderTransactions()">‹ Vorige</button>
+          <button id="btn-next" onclick="txPage++; renderTransactions()">Volgende ›</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ CATEGORIES ═══ -->
+    <div class="page" id="page-categories">
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div>
+          <div class="section-title">Categorieën</div>
+          <div class="section-sub">Definieer categorieën en koppel zoektermen voor automatisch labelen</div>
+        </div>
+        <button class="btn" onclick="openCatModal()">+ Nieuwe Categorie</button>
+      </div>
+      <div class="card">
+        <div class="cat-list" id="cat-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Automatisch Categoriseren <small>past toe op alle transacties</small></div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Klik op de knop om alle transacties automatisch te categoriseren op basis van de zoektermen die u per categorie heeft ingesteld.</p>
+        <button class="btn" onclick="autoLabel()">▶ Categoriseer Alles</button>
+        <span id="auto-result" style="margin-left:12px;font-size:12px;color:var(--text-muted);"></span>
+      </div>
+    </div>
+
+    <!-- ═══ TRENDS ═══ -->
+    <div class="page" id="page-trends">
+      <div>
+        <div class="section-title">Trends</div>
+        <div class="section-sub">Inkomsten en uitgaven over de afgelopen 7 jaar</div>
+      </div>
+      <div class="card">
+        <div class="card-title">Jaarlijks overzicht</div>
+        <div class="chart-wrap" style="height:260px;"><canvas id="chart-yearly"></canvas></div>
+      </div>
+      <div class="chart-grid">
+        <div class="card">
+          <div class="card-title">Gemiddeld per Maand (per jaar)</div>
+          <div class="chart-wrap" style="height:220px;"><canvas id="chart-avg-monthly"></canvas></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Categorie Trend (top 5)</div>
+          <div class="chart-wrap" style="height:220px;"><canvas id="chart-cat-trend"></canvas></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ IMPORT ═══ -->
+    <div class="page" id="page-import">
+      <div>
+        <div class="section-title">CSV Importeren</div>
+        <div class="section-sub">Sleep uw bankbestanden hierheen of klik om te bladeren. Ondersteunt meerdere bestanden tegelijk.</div>
+      </div>
+
+      <div class="import-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" multiple accept=".csv,.txt" onchange="handleFiles(this.files)">
+        <h3>↑ Sleep CSV-bestanden hier naartoe</h3>
+        <p style="margin-top:6px;">Klik of sleep — meerdere bestanden tegelijk mogelijk</p>
+        <p style="margin-top:4px;font-size:11px;color:var(--text-muted);">Verwachte kolommen: Datum · Naam/Omschrijving · Rekening · Tegenrekening · Code · Af Bij · Bedrag (EUR) · Mutatiesoort · Mededelingen · Saldo na mutatie · Tag</p>
+      </div>
+
+      <div id="loaded-files-section" style="display:none;">
+        <div class="section-title" style="font-size:16px;margin-bottom:12px;">Geladen Bestanden</div>
+        <div class="account-files" id="account-files-list"></div>
+      </div>
+
+      <div id="account-mapping-section" style="display:none;">
+        <div class="section-title" style="font-size:16px;margin-bottom:4px;">Rekening Koppeling</div>
+        <div class="section-sub" style="margin-bottom:14px;">Geef elke rekening een naam en eigenaar</div>
+        <div class="mapping-grid" id="account-mapping"></div>
+        <div style="margin-top:16px; display:flex; gap:10px;">
+          <button class="btn" onclick="applyMapping()">✓ Importeer & Verwerk</button>
+          <button class="btn danger" onclick="clearAll()">✕ Alles Wissen</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ SETTINGS ═══ -->
+    <div class="page" id="page-settings">
+      <div>
+        <div class="section-title">Instellingen</div>
+        <div class="section-sub">Beheer uw dashboard-voorkeuren</div>
+      </div>
+      <div class="card" style="max-width:520px;">
+        <div class="card-title">Scheidingsteken CSV</div>
+        <div class="form-row">
+          <label>Kolom scheidingsteken</label>
+          <select id="setting-sep">
+            <option value=";">Puntkomma ( ; ) — standaard ING/Rabobank</option>
+            <option value=",">Komma ( , )</option>
+            <option value="	">Tab</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Decimaal scheidingsteken</label>
+          <select id="setting-dec">
+            <option value=",">Komma ( 1.234,56 ) — NL standaard</option>
+            <option value=".">Punt ( 1,234.56 )</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <label>Datumformaat</label>
+          <select id="setting-datefmt">
+            <option value="YYYYMMDD">JJJJMMDD (bijv. 20240115)</option>
+            <option value="DD-MM-YYYY">DD-MM-JJJJ (bijv. 15-01-2024)</option>
+            <option value="MM/DD/YYYY">MM/DD/JJJJ (bijv. 01/15/2024)</option>
+          </select>
+        </div>
+        <button class="btn" style="margin-top:8px;" onclick="saveSettings()">Opslaan</button>
+      </div>
+      <div class="card" style="max-width:520px;">
+        <div class="card-title">Gegevens</div>
+        <p style="color:var(--text-muted);font-size:13px;margin-bottom:14px;">Alle gegevens worden lokaal opgeslagen in uw browser (localStorage). Er worden geen gegevens naar een server gestuurd.</p>
+        <div style="display:flex; gap:10px;">
+          <button class="btn secondary" onclick="saveToStorage()">💾 Sla op in Browser</button>
+          <button class="btn danger" onclick="if(confirm('Alles verwijderen?')){clearAll();}">✕ Verwijder Alles</button>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ═══ CATEGORY MODAL ═══ -->
+<div class="modal-backdrop" id="cat-modal">
+  <div class="modal">
+    <h3 id="cat-modal-title">Nieuwe Categorie</h3>
+    <div class="form-row">
+      <label>Naam</label>
+      <input type="text" id="cat-name-input" placeholder="bijv. Boodschappen">
+    </div>
+    <div class="form-row">
+      <label>Kleur</label>
+      <input type="color" id="cat-color-input" value="#7eb8a4" style="height:36px;padding:2px;">
+    </div>
+    <div class="form-row">
+      <label>Zoektermen (kommagescheiden, in naam/omschrijving)</label>
+      <input type="text" id="cat-keywords-input" placeholder="bijv. albert heijn, jumbo, lidl, plus">
+    </div>
+    <div class="form-row">
+      <label>Type</label>
+      <select id="cat-type-input">
+        <option value="">Alle</option>
+        <option value="Af">Uitgaven</option>
+        <option value="Bij">Inkomsten</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeCatModal()">Annuleren</button>
+      <button class="btn" onclick="saveCat()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ LABEL MODAL ═══ -->
+<div class="modal-backdrop" id="label-modal">
+  <div class="modal">
+    <h3>Categorie Instellen</h3>
+    <div class="form-row">
+      <label>Transactie</label>
+      <input type="text" id="label-tx-name" readonly style="background:var(--surface2);">
+    </div>
+    <div class="form-row">
+      <label>Categorie</label>
+      <select id="label-cat-select"></select>
+    </div>
+    <div class="form-row">
+      <label>Ook toepassen op vergelijkbare transacties?</label>
+      <select id="label-apply-all">
+        <option value="0">Nee, alleen deze</option>
+        <option value="1">Ja, alle met dezelfde naam</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn secondary" onclick="closeLabelModal()">Annuleren</button>
+      <button class="btn" onclick="saveLabel()">Opslaan</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ════════════════════════════════════════════
+//  STATE
+// ════════════════════════════════════════════
+let allTransactions = [];
+let accountMeta = {};  // rekening -> { name, owner, type }
+let categories = [
+  { id: 'inkomen',    name: 'Inkomen',       color: '#7eb8a4', keywords: ['salaris','loon','uitkering','pensioen'], type: 'Bij' },
+  { id: 'wonen',      name: 'Wonen',         color: '#c8a96e', keywords: ['hypotheek','huur','gas','water','licht','energie','nuon','vattenfall','eneco'], type: 'Af' },
+  { id: 'boodschappen', name: 'Boodschappen', color: '#a3c97e', keywords: ['albert heijn','jumbo','lidl','aldi','plus','dirk','ah ','ah,'], type: 'Af' },
+  { id: 'transport',  name: 'Transport',     color: '#8fa3d4', keywords: ['ns ','ov-chipkaart','shell','bp ','tinq','benzine','parkeer','parking'], type: 'Af' },
+  { id: 'sparen',     name: 'Spaarrekening', color: '#d4a87e', keywords: ['spaar','oranje spaar','internet sparen'], type: '' },
+  { id: 'zorg',       name: 'Zorg',          color: '#d47ea8', keywords: ['apotheek','huisarts','zorgverzekering','zorg','fysiotherap','tandarts'], type: 'Af' },
+  { id: 'entertainment', name: 'Vrije tijd', color: '#a87ed4', keywords: ['netflix','spotify','bioscoop','restaurant','cafe','eten'], type: 'Af' },
+  { id: 'overig',     name: 'Overig',        color: '#6a7080', keywords: [], type: '' },
+];
+let currentLabelTxIndex = null;
+let txPage = 0;
+const TX_PER_PAGE = 50;
+let txSortKey = 'datum';
+let txSortDir = -1;
+let settings = { sep: ';', dec: ',', datefmt: 'YYYYMMDD' };
+let pendingFiles = [];
+let charts = {};
+
+// ════════════════════════════════════════════
+//  NAV
+// ════════════════════════════════════════════
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.textContent.toLowerCase().includes(id === 'dashboard' ? '◈' : id === 'accounts' ? '⬡' : id === 'transactions' ? '≡' : id === 'categories' ? '◉' : id === 'trends' ? '∿' : id === 'import' ? '↑' : '⚙')) {
+      n.classList.add('active');
+    }
+  });
+  // fix: match by onclick
+  document.querySelectorAll('.nav-item').forEach(n => {
+    if (n.getAttribute('onclick') && n.getAttribute('onclick').includes("'" + id + "'")) {
+      n.classList.add('active');
+    }
+  });
+  if (id === 'trends') renderTrends();
+  if (id === 'categories') renderCatList();
+  if (id === 'accounts') renderAccounts();
+  if (id === 'transactions') { populateTxFilters(); renderTransactions(); }
+}
+
+// ════════════════════════════════════════════
+//  FILE IMPORT
+// ════════════════════════════════════════════
+const dropZone = document.getElementById('drop-zone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
+
+function handleFiles(files) {
+  Array.from(files).forEach(file => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      pendingFiles.push({ name: file.name, content: e.target.result, rows: 0 });
+      renderFileList();
+    };
+    reader.readAsText(file, 'UTF-8');
+  });
+}
+
+function renderFileList() {
+  const sec = document.getElementById('loaded-files-section');
+  const mapSec = document.getElementById('account-mapping-section');
+  if (!pendingFiles.length) { sec.style.display = 'none'; mapSec.style.display = 'none'; return; }
+  sec.style.display = 'block';
+  mapSec.style.display = 'block';
+  const list = document.getElementById('account-files-list');
+  list.innerHTML = pendingFiles.map((f, i) => `
+    <div class="account-file-card">
+      <div>
+        <div class="name">${f.name}</div>
+        <div class="meta">${f.rows || '?'} rijen</div>
+      </div>
+      <div class="dot"></div>
+      <span class="remove" onclick="pendingFiles.splice(${i},1);renderFileList()">×</span>
+    </div>
+  `).join('');
+
+  // Build mapping UI — detect unique accounts across files
+  const accounts = new Set();
+  pendingFiles.forEach(f => {
+    const rows = parseCSV(f.content);
+    f.rows = rows.length;
+    rows.forEach(r => { if (r['Rekening']) accounts.add(r['Rekening']); });
+  });
+
+  const mapDiv = document.getElementById('account-mapping');
+  mapDiv.innerHTML = [...accounts].map(acc => `
+    <div class="mapping-card">
+      <label>Rekeningnummer</label>
+      <input type="text" value="${acc}" readonly style="font-size:11px;letter-spacing:0.5px;">
+      <label style="margin-top:10px;">Naam</label>
+      <input type="text" id="map-name-${acc}" placeholder="bijv. Mijn betaalrekening" value="${accountMeta[acc]?.name || guessName(acc)}">
+      <label style="margin-top:10px;">Eigenaar</label>
+      <select id="map-owner-${acc}">
+        <option value="ik">Ik</option>
+        <option value="man">Man</option>
+        <option value="zoon">Zoon</option>
+        <option value="gezin">Huisrekening</option>
+        <option value="anders">Andere bank</option>
+      </select>
+      <label style="margin-top:10px;">Type</label>
+      <select id="map-type-${acc}">
+        <option value="betaal">Betaalrekening</option>
+        <option value="spaar">Spaarrekening</option>
+      </select>
+    </div>
+  `).join('');
+
+  // re-render file list with updated row counts
+  list.innerHTML = pendingFiles.map((f, i) => `
+    <div class="account-file-card">
+      <div>
+        <div class="name">${f.name}</div>
+        <div class="meta">${f.rows} rijen</div>
+      </div>
+      <div class="dot"></div>
+      <span class="remove" onclick="pendingFiles.splice(${i},1);renderFileList()">×</span>
+    </div>
+  `).join('');
+}
+
+function guessName(acc) {
+  if (!acc) return '';
+  const s = acc.toLowerCase();
+  if (s.includes('spaar')) return 'Spaarrekening';
+  return '';
+}
+
+function applyMapping() {
+  const accounts = new Set();
+  pendingFiles.forEach(f => {
+    const rows = parseCSV(f.content);
+    rows.forEach(r => { if (r['Rekening']) accounts.add(r['Rekening']); });
+  });
+  [...accounts].forEach(acc => {
+    accountMeta[acc] = {
+      name: document.getElementById('map-name-' + acc)?.value || acc,
+      owner: document.getElementById('map-owner-' + acc)?.value || 'ik',
+      type: document.getElementById('map-type-' + acc)?.value || 'betaal',
+    };
+  });
+
+  let newTx = [];
+  pendingFiles.forEach(f => {
+    const rows = parseCSV(f.content);
+    rows.forEach(r => newTx.push(normalizeRow(r)));
+  });
+  newTx = newTx.filter(r => r && r.datum);
+
+  // Merge (deduplicate by hash)
+  const existing = new Set(allTransactions.map(t => txHash(t)));
+  const added = newTx.filter(t => !existing.has(txHash(t)));
+  allTransactions = [...allTransactions, ...added];
+  allTransactions.sort((a, b) => b.datum.localeCompare(a.datum));
+
+  autoLabel();
+  populateFilters();
+  populateTxFilters();
+  applyFilters();
+  renderAccounts();
+  toast(`✓ ${added.length} nieuwe transacties geladen (${allTransactions.length} totaal)`);
+  saveToStorage();
+  showPage('dashboard');
+}
+
+function txHash(t) {
+  return `${t.datum}|${t.rekening}|${t.bedrag}|${t.naam}`;
+}
+
+// ════════════════════════════════════════════
+//  CSV PARSE
+// ════════════════════════════════════════════
+function parseCSV(text) {
+  const sep = settings.sep;
+  const lines = text.trim().split(/\r?\n/);
+  if (!lines.length) return [];
+  const headers = splitCSVLine(lines[0], sep).map(h => h.replace(/^"|"$/g, '').trim());
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    if (!lines[i].trim()) continue;
+    const vals = splitCSVLine(lines[i], sep).map(v => v.replace(/^"|"$/g, '').trim());
+    const obj = {};
+    headers.forEach((h, idx) => { obj[h] = vals[idx] || ''; });
+    rows.push(obj);
+  }
+  return rows;
+}
+
+function splitCSVLine(line, sep) {
+  const result = [];
+  let cur = '';
+  let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === sep && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result;
+}
+
+function normalizeRow(r) {
+  // Flexible column mapping
+  const datum = r['Datum'] || r['datum'] || r['Date'] || '';
+  const naam = r['Naam / Omschrijving'] || r['Naam/Omschrijving'] || r['Omschrijving'] || r['Description'] || '';
+  const rekening = r['Rekening'] || r['Account'] || '';
+  const tegenrekening = r['Tegenrekening'] || r['Counterparty'] || '';
+  const code = r['Code'] || '';
+  const afbij = r['Af Bij'] || r['Af/Bij'] || r['Type'] || '';
+  const bedragRaw = r['Bedrag (EUR)'] || r['Bedrag'] || r['Amount'] || '0';
+  const mutatiesoort = r['Mutatiesoort'] || r['Mutation type'] || '';
+  const mededelingen = r['Mededelingen'] || r['Notes'] || '';
+  const saldo = r['Saldo na mutatie'] || r['Saldo'] || '';
+  const tag = r['Tag'] || '';
+
+  const bedrag = parseBedrag(bedragRaw);
+  const parsedDate = parseDate(datum);
+  if (!parsedDate) return null;
+
+  return { datum: parsedDate, naam, rekening, tegenrekening, code, afbij, bedrag, mutatiesoort, mededelingen, saldo: parseBedrag(saldo), tag, categorie: '' };
+}
+
+function parseBedrag(s) {
+  if (!s) return 0;
+  let str = String(s).trim();
+  if (settings.dec === ',') {
+    str = str.replace(/\./g, '').replace(',', '.');
+  } else {
+    str = str.replace(/,/g, '');
+  }
+  return parseFloat(str) || 0;
+}
+
+function parseDate(s) {
+  if (!s) return null;
+  s = s.trim();
+  if (/^\d{8}$/.test(s)) return s.slice(0,4) + '-' + s.slice(4,6) + '-' + s.slice(6,8);
+  if (/^\d{2}-\d{2}-\d{4}$/.test(s)) return s.slice(6) + '-' + s.slice(3,5) + '-' + s.slice(0,2);
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(s)) return s.slice(6) + '-' + s.slice(0,2) + '-' + s.slice(3,5);
+  return null;
+}
+
+// ════════════════════════════════════════════
+//  FILTERS & SELECTS
+// ════════════════════════════════════════════
+function getYears() {
+  const ys = [...new Set(allTransactions.map(t => t.datum.slice(0,4)))].sort();
+  return ys;
+}
+function getMonths() { return ['01','02','03','04','05','06','07','08','09','10','11','12']; }
+const MONTH_NL = ['Jan','Feb','Mrt','Apr','Mei','Jun','Jul','Aug','Sep','Okt','Nov','Dec'];
+
+function populateFilters() {
+  const years = getYears();
+  const accounts = [...new Set(allTransactions.map(t => t.rekening))];
+  ['filter-year', 'filter-month', 'filter-account'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    if (id === 'filter-year') {
+      el.innerHTML = '<option value="">Alle Jaren</option>' + years.map(y => `<option>${y}</option>`).join('');
+      if (years.includes(prev)) el.value = prev;
+    }
+    if (id === 'filter-month') {
+      el.innerHTML = '<option value="">Alle Maanden</option>' + getMonths().map((m, i) => `<option value="${m}">${MONTH_NL[i]}</option>`).join('');
+      if (prev) el.value = prev;
+    }
+    if (id === 'filter-account') {
+      el.innerHTML = '<option value="">Alle Rekeningen</option>' + accounts.map(a => `<option value="${a}">${accountMeta[a]?.name || a}</option>`).join('');
+      if (accounts.includes(prev)) el.value = prev;
+    }
+  });
+}
+
+function populateTxFilters() {
+  const years = getYears();
+  const accounts = [...new Set(allTransactions.map(t => t.rekening))];
+  const cats = ['', ...categories.map(c => c.name), 'Geen categorie'];
+  ['tx-filter-year'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = '<option value="">Alle Jaren</option>' + years.map(y => `<option>${y}</option>`).join('');
+  });
+  document.getElementById('tx-filter-month').innerHTML = '<option value="">Alle Maanden</option>' + getMonths().map((m,i) => `<option value="${m}">${MONTH_NL[i]}</option>`).join('');
+  document.getElementById('tx-filter-account').innerHTML = '<option value="">Alle Rekeningen</option>' + accounts.map(a => `<option value="${a}">${accountMeta[a]?.name || a}</option>`).join('');
+  document.getElementById('tx-filter-cat').innerHTML = '<option value="">Alle Categorieën</option>' + categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('') + '<option value="_geen">Geen categorie</option>';
+}
+
+function getFilteredTx() {
+  const year = document.getElementById('filter-year')?.value || '';
+  const month = document.getElementById('filter-month')?.value || '';
+  const acc = document.getElementById('filter-account')?.value || '';
+  return allTransactions.filter(t => {
+    if (year && !t.datum.startsWith(year)) return false;
+    if (month && t.datum.slice(5,7) !== month) return false;
+    if (acc && t.rekening !== acc) return false;
+    return true;
+  });
+}
+
+function applyFilters() {
+  const filtered = getFilteredTx();
+  const year = document.getElementById('filter-year')?.value || '';
+  const month = document.getElementById('filter-month')?.value || '';
+  const monthName = month ? MONTH_NL[parseInt(month)-1] : '';
+  document.getElementById('dash-period-label').textContent = filtered.length
+    ? `${filtered.length} transacties · ${[monthName, year].filter(Boolean).join(' ') || 'alle periodes'}`
+    : 'Geen gegevens voor deze filter';
+
+  const income = filtered.filter(t => t.afbij === 'Bij').reduce((s, t) => s + Math.abs(t.bedrag), 0);
+  const expense = filtered.filter(t => t.afbij === 'Af').reduce((s, t) => s + Math.abs(t.bedrag), 0);
+  const savings = filtered.filter(t => t.categorie === 'Spaarrekening').reduce((s, t) => s + Math.abs(t.bedrag), 0);
+  document.getElementById('kpi-income').textContent = '€ ' + fmt(income);
+  document.getElementById('kpi-expense').textContent = '€ ' + fmt(expense);
+  document.getElementById('kpi-savings').textContent = '€ ' + fmt(savings);
+  document.getElementById('kpi-net').textContent = '€ ' + fmt(income - expense);
+  document.getElementById('kpi-net').style.color = income >= expense ? 'var(--income)' : 'var(--expense)';
+  document.getElementById('kpi-count').textContent = filtered.length;
+
+  renderMonthlyChart(filtered, year);
+  renderCatPie(filtered);
+  renderCatBars(filtered);
+  renderRecentTx(filtered);
+}
+
+// ════════════════════════════════════════════
+//  CHARTS
+// ════════════════════════════════════════════
+function mkChart(id, cfg) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(el, cfg);
+}
+
+function renderMonthlyChart(filtered, year) {
+  const months = ['01','02','03','04','05','06','07','08','09','10','11','12'];
+  const labels = MONTH_NL;
+  const useYear = year || (allTransactions[0]?.datum.slice(0,4));
+  document.getElementById('chart-year-label').textContent = useYear || '';
+
+  // Use all data for year if no month filter
+  const txYear = allTransactions.filter(t => !useYear || t.datum.startsWith(useYear));
+  const income = months.map(m => txYear.filter(t => t.datum.slice(5,7) === m && t.afbij === 'Bij').reduce((s,t) => s+Math.abs(t.bedrag),0));
+  const expense = months.map(m => txYear.filter(t => t.datum.slice(5,7) === m && t.afbij === 'Af').reduce((s,t) => s+Math.abs(t.bedrag),0));
+
+  mkChart('chart-monthly', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Inkomsten', data: income, backgroundColor: 'rgba(126,184,164,0.7)', borderRadius: 4 },
+        { label: 'Uitgaven', data: expense, backgroundColor: 'rgba(224,112,112,0.7)', borderRadius: 4 },
+      ]
+    },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#7a8099', font: { family: 'DM Sans' } } } }, scales: { x: { ticks: { color: '#7a8099' }, grid: { color: 'rgba(42,48,72,0.4)' } }, y: { ticks: { color: '#7a8099', callback: v => '€' + fmt(v) }, grid: { color: 'rgba(42,48,72,0.4)' } } } }
+  });
+}
+
+function renderCatPie(filtered) {
+  const expenses = filtered.filter(t => t.afbij === 'Af');
+  const catTotals = {};
+  expenses.forEach(t => {
+    const c = t.categorie || 'Overig';
+    catTotals[c] = (catTotals[c] || 0) + Math.abs(t.bedrag);
+  });
+  const sorted = Object.entries(catTotals).sort((a,b) => b[1]-a[1]).slice(0,8);
+  const catColors = sorted.map(([name]) => {
+    const cat = categories.find(c => c.name === name);
+    return cat ? cat.color : '#6a7080';
+  });
+  mkChart('chart-cat-pie', {
+    type: 'doughnut',
+    data: { labels: sorted.map(e=>e[0]), datasets: [{ data: sorted.map(e=>e[1]), backgroundColor: catColors, borderWidth: 2, borderColor: '#181c27' }] },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#7a8099', font: { family: 'DM Sans', size: 11 }, boxWidth: 12 } } } }
+  });
+}
+
+function renderCatBars(filtered) {
+  const expenses = filtered.filter(t => t.afbij === 'Af');
+  const catTotals = {};
+  expenses.forEach(t => {
+    const c = t.categorie || 'Overig';
+    catTotals[c] = (catTotals[c] || 0) + Math.abs(t.bedrag);
+  });
+  const sorted = Object.entries(catTotals).sort((a,b) => b[1]-a[1]).slice(0,6);
+  const max = sorted[0]?.[1] || 1;
+  const el = document.getElementById('cat-bars');
+  if (!sorted.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:12px;">Geen uitgaven in deze periode</p>'; return; }
+  el.innerHTML = sorted.map(([name, val]) => {
+    const cat = categories.find(c => c.name === name);
+    const color = cat ? cat.color : '#6a7080';
+    const pct = (val / max * 100).toFixed(0);
+    return `<div style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:12px;">${name}</span>
+        <span style="font-size:12px;color:var(--expense);">€ ${fmt(val)}</span>
+      </div>
+      <div class="progress-bar-wrap"><div class="progress-bar" style="width:${pct}%;background:${color};"></div></div>
+    </div>`;
+  }).join('');
+}
+
+function renderRecentTx(filtered) {
+  const el = document.getElementById('recent-tx');
+  const recent = filtered.slice(0, 6);
+  if (!recent.length) { el.innerHTML = '<p style="color:var(--text-muted);">Geen transacties</p>'; return; }
+  el.innerHTML = recent.map(t => `
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(42,48,72,0.4);">
+      <div>
+        <div style="font-weight:500;font-size:12px;">${t.naam.slice(0,32)}${t.naam.length>32?'…':''}</div>
+        <div style="color:var(--text-muted);font-size:11px;">${t.datum} · ${accountMeta[t.rekening]?.name || t.rekening}</div>
+      </div>
+      <span class="${t.afbij === 'Bij' ? 'amount-in' : 'amount-out'}" style="font-size:13px;">
+        ${t.afbij === 'Bij' ? '+' : '-'}€ ${fmt(Math.abs(t.bedrag))}
+      </span>
+    </div>
+  `).join('');
+}
+
+function renderTrends() {
+  if (!allTransactions.length) return;
+  const years = getYears();
+  const income = years.map(y => allTransactions.filter(t => t.datum.startsWith(y) && t.afbij === 'Bij').reduce((s,t) => s+Math.abs(t.bedrag),0));
+  const expense = years.map(y => allTransactions.filter(t => t.datum.startsWith(y) && t.afbij === 'Af').reduce((s,t) => s+Math.abs(t.bedrag),0));
+  mkChart('chart-yearly', {
+    type: 'bar',
+    data: { labels: years, datasets: [
+      { label: 'Inkomsten', data: income, backgroundColor: 'rgba(126,184,164,0.7)', borderRadius: 4 },
+      { label: 'Uitgaven', data: expense, backgroundColor: 'rgba(224,112,112,0.7)', borderRadius: 4 },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#7a8099' } } }, scales: { x: { ticks: { color: '#7a8099' }, grid: { color: 'rgba(42,48,72,0.3)' } }, y: { ticks: { color: '#7a8099', callback: v => '€' + fmt(v) }, grid: { color: 'rgba(42,48,72,0.3)' } } } }
+  });
+
+  // avg monthly per year
+  const avgIncome = years.map((y, i) => income[i] / 12);
+  const avgExpense = years.map((y, i) => expense[i] / 12);
+  mkChart('chart-avg-monthly', {
+    type: 'line',
+    data: { labels: years, datasets: [
+      { label: 'Gem. Inkomen/mnd', data: avgIncome, borderColor: 'rgba(126,184,164,0.9)', backgroundColor: 'rgba(126,184,164,0.1)', tension: 0.4, fill: true },
+      { label: 'Gem. Uitgave/mnd', data: avgExpense, borderColor: 'rgba(224,112,112,0.9)', backgroundColor: 'rgba(224,112,112,0.1)', tension: 0.4, fill: true },
+    ]},
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#7a8099' } } }, scales: { x: { ticks: { color: '#7a8099' }, grid: { color: 'rgba(42,48,72,0.3)' } }, y: { ticks: { color: '#7a8099', callback: v => '€' + fmt(v) }, grid: { color: 'rgba(42,48,72,0.3)' } } } }
+  });
+
+  // top 5 cat trend
+  const catTotals = {};
+  categories.forEach(c => { catTotals[c.name] = 0; });
+  allTransactions.filter(t => t.afbij === 'Af').forEach(t => {
+    const c = t.categorie || 'Overig';
+    catTotals[c] = (catTotals[c] || 0) + Math.abs(t.bedrag);
+  });
+  const top5 = Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).slice(0,5).map(e=>e[0]);
+  const datasets = top5.map(name => {
+    const cat = categories.find(c => c.name === name);
+    return {
+      label: name,
+      data: years.map(y => allTransactions.filter(t => t.datum.startsWith(y) && t.afbij === 'Af' && (t.categorie || 'Overig') === name).reduce((s,t) => s+Math.abs(t.bedrag),0)),
+      borderColor: cat ? cat.color : '#6a7080',
+      backgroundColor: 'transparent',
+      tension: 0.4,
+    };
+  });
+  mkChart('chart-cat-trend', {
+    type: 'line',
+    data: { labels: years, datasets },
+    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#7a8099', font: { size: 10 } } } }, scales: { x: { ticks: { color: '#7a8099' }, grid: { color: 'rgba(42,48,72,0.3)' } }, y: { ticks: { color: '#7a8099', callback: v => '€' + fmt(v) }, grid: { color: 'rgba(42,48,72,0.3)' } } } }
+  });
+}
+
+// ════════════════════════════════════════════
+//  TRANSACTIONS TABLE
+// ════════════════════════════════════════════
+function renderTransactions() {
+  const year = document.getElementById('tx-filter-year')?.value || '';
+  const month = document.getElementById('tx-filter-month')?.value || '';
+  const acc = document.getElementById('tx-filter-account')?.value || '';
+  const cat = document.getElementById('tx-filter-cat')?.value || '';
+  const dir = document.getElementById('tx-filter-dir')?.value || '';
+  const q = (document.getElementById('tx-search')?.value || '').toLowerCase();
+
+  let filtered = allTransactions.filter(t => {
+    if (year && !t.datum.startsWith(year)) return false;
+    if (month && t.datum.slice(5,7) !== month) return false;
+    if (acc && t.rekening !== acc) return false;
+    if (cat === '_geen' && t.categorie) return false;
+    if (cat && cat !== '_geen' && t.categorie !== cat) return false;
+    if (dir && t.afbij !== dir) return false;
+    if (q && !t.naam.toLowerCase().includes(q) && !t.mededelingen.toLowerCase().includes(q) && !t.rekening.includes(q)) return false;
+    return true;
+  });
+
+  // sort
+  filtered.sort((a, b) => {
+    let va = a[txSortKey === 'datum' ? 'datum' : txSortKey === 'naam' ? 'naam' : 'bedrag'];
+    let vb = b[txSortKey === 'datum' ? 'datum' : txSortKey === 'naam' ? 'naam' : 'bedrag'];
+    if (typeof va === 'string') return txSortDir * va.localeCompare(vb);
+    return txSortDir * (va - vb);
+  });
+
+  document.getElementById('tx-count-label').textContent = filtered.length + ' transacties';
+
+  const total = filtered.length;
+  const pages = Math.max(1, Math.ceil(total / TX_PER_PAGE));
+  if (txPage >= pages) txPage = pages - 1;
+  const slice = filtered.slice(txPage * TX_PER_PAGE, (txPage + 1) * TX_PER_PAGE);
+
+  document.getElementById('page-info').textContent = `${txPage * TX_PER_PAGE + 1}–${Math.min((txPage+1)*TX_PER_PAGE, total)} van ${total}`;
+  document.getElementById('btn-prev').disabled = txPage === 0;
+  document.getElementById('btn-next').disabled = txPage >= pages - 1;
+
+  const body = document.getElementById('tx-table-body');
+  body.innerHTML = slice.map((t, i) => {
+    const realIdx = allTransactions.indexOf(t);
+    const catBadge = t.categorie
+      ? `<span class="badge" onclick="openLabelModal(${realIdx})">${t.categorie}</span>`
+      : `<span class="badge" onclick="openLabelModal(${realIdx})" style="color:var(--text-muted);">+ Label</span>`;
+    const tagBubble = t.tag ? `<span class="tag-bubble">${t.tag}</span>` : '';
+    return `<tr>
+      <td>${t.datum}</td>
+      <td title="${t.naam}">${t.naam.slice(0,36)}${t.naam.length>36?'…':''}</td>
+      <td style="font-size:11px;color:var(--text-muted);">${accountMeta[t.rekening]?.name || t.rekening}</td>
+      <td style="font-size:11px;color:var(--text-muted);">${t.tegenrekening?.slice(0,16) || ''}</td>
+      <td style="font-size:11px;">${t.code}</td>
+      <td class="${t.afbij === 'Bij' ? 'amount-in' : 'amount-out'}">${t.afbij === 'Bij' ? '+' : '-'}€ ${fmt(Math.abs(t.bedrag))}</td>
+      <td style="font-size:11px;">${t.mutatiesoort}</td>
+      <td>${catBadge}</td>
+      <td>${tagBubble}</td>
+      <td style="font-size:11px;color:var(--text-muted);">€ ${fmt(t.saldo)}</td>
+    </tr>`;
+  }).join('');
+}
+
+function sortTx(key) {
+  if (txSortKey === key) txSortDir *= -1;
+  else { txSortKey = key; txSortDir = -1; }
+  txPage = 0;
+  renderTransactions();
+}
+
+// ════════════════════════════════════════════
+//  LABEL MODAL
+// ════════════════════════════════════════════
+function openLabelModal(idx) {
+  currentLabelTxIndex = idx;
+  const t = allTransactions[idx];
+  document.getElementById('label-tx-name').value = t.naam;
+  const sel = document.getElementById('label-cat-select');
+  sel.innerHTML = '<option value="">— Geen —</option>' + categories.map(c => `<option value="${c.name}" ${t.categorie === c.name ? 'selected' : ''}>${c.name}</option>`).join('');
+  document.getElementById('label-modal').classList.add('open');
+}
+function closeLabelModal() { document.getElementById('label-modal').classList.remove('open'); }
+function saveLabel() {
+  const cat = document.getElementById('label-cat-select').value;
+  const applyAll = document.getElementById('label-apply-all').value === '1';
+  const t = allTransactions[currentLabelTxIndex];
+  if (applyAll) {
+    allTransactions.filter(tx => tx.naam === t.naam).forEach(tx => { tx.categorie = cat; });
+  } else {
+    t.categorie = cat;
+  }
+  closeLabelModal();
+  renderTransactions();
+  applyFilters();
+  saveToStorage();
+  toast('Categorie opgeslagen');
+}
+
+// ════════════════════════════════════════════
+//  AUTO LABEL
+// ════════════════════════════════════════════
+function autoLabel() {
+  let count = 0;
+  allTransactions.forEach(t => {
+    if (t.categorie) return;
+    for (const cat of categories) {
+      if (!cat.keywords.length) continue;
+      if (cat.type && cat.type !== t.afbij) continue;
+      const haystack = (t.naam + ' ' + t.mededelingen).toLowerCase();
+      if (cat.keywords.some(kw => haystack.includes(kw.toLowerCase()))) {
+        t.categorie = cat.name;
+        count++;
+        break;
+      }
+    }
+  });
+  document.getElementById('auto-result').textContent = `${count} transacties gecategoriseerd`;
+  saveToStorage();
+  return count;
+}
+
+// ════════════════════════════════════════════
+//  CATEGORY EDITOR
+// ════════════════════════════════════════════
+let editCatId = null;
+function openCatModal(id) {
+  editCatId = id || null;
+  const cat = id ? categories.find(c => c.id === id) : null;
+  document.getElementById('cat-modal-title').textContent = cat ? 'Categorie Bewerken' : 'Nieuwe Categorie';
+  document.getElementById('cat-name-input').value = cat?.name || '';
+  document.getElementById('cat-color-input').value = cat?.color || '#7eb8a4';
+  document.getElementById('cat-keywords-input').value = cat?.keywords.join(', ') || '';
+  document.getElementById('cat-type-input').value = cat?.type || '';
+  document.getElementById('cat-modal').classList.add('open');
+}
+function closeCatModal() { document.getElementById('cat-modal').classList.remove('open'); }
+function saveCat() {
+  const name = document.getElementById('cat-name-input').value.trim();
+  if (!name) return;
+  const keywords = document.getElementById('cat-keywords-input').value.split(',').map(k=>k.trim()).filter(Boolean);
+  const color = document.getElementById('cat-color-input').value;
+  const type = document.getElementById('cat-type-input').value;
+  if (editCatId) {
+    const cat = categories.find(c => c.id === editCatId);
+    Object.assign(cat, { name, keywords, color, type });
+  } else {
+    categories.push({ id: 'cat_' + Date.now(), name, keywords, color, type });
+  }
+  closeCatModal();
+  renderCatList();
+  saveToStorage();
+  toast('Categorie opgeslagen');
+}
+
+function renderCatList() {
+  const el = document.getElementById('cat-list');
+  el.innerHTML = categories.map(c => {
+    const count = allTransactions.filter(t => t.categorie === c.name).length;
+    return `<div class="cat-row">
+      <div class="cat-color" style="background:${c.color};"></div>
+      <div class="cat-name">${c.name}</div>
+      <div class="cat-keywords">${c.keywords.join(' · ') || '—'} ${c.type ? `<span style="color:var(--accent4);">[${c.type === 'Bij' ? 'Inkomsten' : 'Uitgaven'}]</span>` : ''}</div>
+      <div style="font-size:11px;color:var(--text-muted);min-width:60px;">${count} tx</div>
+      <div class="cat-actions">
+        <button class="btn secondary" style="padding:4px 10px;font-size:11px;" onclick="openCatModal('${c.id}')">✎ Bewerk</button>
+        <button class="btn danger" style="padding:4px 10px;font-size:11px;" onclick="deleteCat('${c.id}')">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function deleteCat(id) {
+  if (!confirm('Categorie verwijderen?')) return;
+  const name = categories.find(c => c.id === id)?.name;
+  categories = categories.filter(c => c.id !== id);
+  allTransactions.forEach(t => { if (t.categorie === name) t.categorie = ''; });
+  renderCatList();
+  saveToStorage();
+}
+
+// ════════════════════════════════════════════
+//  ACCOUNTS
+// ════════════════════════════════════════════
+function renderAccounts() {
+  const grid = document.getElementById('accounts-grid');
+  const accounts = [...new Set(allTransactions.map(t => t.rekening))];
+  if (!accounts.length) {
+    grid.innerHTML = '<div class="empty-state" style="grid-column:1/-1;"><div class="icon">⬡</div><h3>Nog geen rekeningen</h3><p>Importeer CSV-bestanden om uw rekeningen te zien.</p></div>';
+    return;
+  }
+  const latestYear = getYears().slice(-1)[0] || '';
+  grid.innerHTML = accounts.map(acc => {
+    const meta = accountMeta[acc] || {};
+    const txs = allTransactions.filter(t => t.rekening === acc);
+    const txMonth = txs.filter(t => t.datum.startsWith(latestYear));
+    const income = txMonth.filter(t => t.afbij === 'Bij').reduce((s,t) => s+Math.abs(t.bedrag),0);
+    const expense = txMonth.filter(t => t.afbij === 'Af').reduce((s,t) => s+Math.abs(t.bedrag),0);
+    const lastSaldo = txs[0]?.saldo || 0;
+    const ownerLabels = { ik: 'Ik', man: 'Man', zoon: 'Zoon', gezin: 'Huisrekening', anders: 'Andere bank' };
+    const typeLabels = { betaal: 'Betaal', spaar: 'Spaar' };
+    return `<div class="account-card">
+      <div class="ac-header">
+        <div>
+          <div class="ac-name">${meta.name || acc}</div>
+          <div class="ac-owner">${ownerLabels[meta.owner] || ''} · ${acc}</div>
+        </div>
+        <div class="ac-type-badge">${typeLabels[meta.type] || 'Rekening'}</div>
+      </div>
+      <div class="ac-balance">€ ${fmt(lastSaldo)}</div>
+      <div class="ac-stats">
+        <div class="ac-stat">Inkomsten (${latestYear})<span class="in">€ ${fmt(income)}</span></div>
+        <div class="ac-stat">Uitgaven (${latestYear})<span class="out">€ ${fmt(expense)}</span></div>
+        <div class="ac-stat">Transacties<span>${txs.length}</span></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════
+function fmt(n) {
+  if (isNaN(n)) return '0,00';
+  return Math.abs(n).toLocaleString('nl-NL', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+function exportCSV() {
+  const filtered = getFilteredTx();
+  const headers = ['Datum','Naam / Omschrijving','Rekening','Rekeningnaam','Tegenrekening','Code','Af Bij','Bedrag (EUR)','Mutatiesoort','Mededelingen','Saldo na mutatie','Tag','Categorie'];
+  const rows = filtered.map(t => [t.datum, t.naam, t.rekening, accountMeta[t.rekening]?.name||'', t.tegenrekening, t.code, t.afbij, t.bedrag, t.mutatiesoort, t.mededelingen, t.saldo, t.tag, t.categorie]);
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v||'').replace(/"/g,'""')}"`).join(';')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = 'export_financieel_dashboard.csv';
+  a.click();
+  toast('Export gedownload');
+}
+
+function saveToStorage() {
+  try {
+    localStorage.setItem('fd_transactions', JSON.stringify(allTransactions));
+    localStorage.setItem('fd_accountMeta', JSON.stringify(accountMeta));
+    localStorage.setItem('fd_categories', JSON.stringify(categories));
+    localStorage.setItem('fd_settings', JSON.stringify(settings));
+  } catch(e) { console.warn('localStorage vol of niet beschikbaar', e); }
+}
+
+function loadFromStorage() {
+  try {
+    const tx = localStorage.getItem('fd_transactions');
+    const meta = localStorage.getItem('fd_accountMeta');
+    const cats = localStorage.getItem('fd_categories');
+    const sett = localStorage.getItem('fd_settings');
+    if (tx) allTransactions = JSON.parse(tx);
+    if (meta) accountMeta = JSON.parse(meta);
+    if (cats) categories = JSON.parse(cats);
+    if (sett) settings = JSON.parse(sett);
+  } catch(e) {}
+}
+
+function clearAll() {
+  allTransactions = [];
+  accountMeta = {};
+  pendingFiles = [];
+  localStorage.clear();
+  renderFileList();
+  renderCatList();
+  renderAccounts();
+  populateFilters();
+  applyFilters();
+  toast('Alles gewist');
+}
+
+function saveSettings() {
+  settings.sep = document.getElementById('setting-sep').value;
+  settings.dec = document.getElementById('setting-dec').value;
+  settings.datefmt = document.getElementById('setting-datefmt').value;
+  saveToStorage();
+  toast('Instellingen opgeslagen');
+}
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+loadFromStorage();
+populateFilters();
+populateTxFilters();
+applyFilters();
+renderCatList();
+renderAccounts();
+
+// Add month/year selects for trends
+document.getElementById('filter-month').innerHTML = '<option value="">Alle Maanden</option>' + getMonths().map((m,i)=>`<option value="${m}">${MONTH_NL[i]}</option>`).join('');
+</script>
+</body>
+</html>
